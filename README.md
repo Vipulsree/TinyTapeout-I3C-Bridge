@@ -16,19 +16,28 @@ Course: EC373TA VLSI Physical Design. Track A (the six-mode bridge) lives in its
 | --- | --- | --- |
 | 1 | Repo, I3C subset + identity frozen, test setup, I²C bus models | Done |
 | 2 | Python I3C controller model; `sync2_edge`, `clkdiv`, `fifo4x8` | Done |
-| 2 | 20-bit timeout module (`timeout20`), wired in with `cmd_ctrl` | Module done |
-| 3 | `i3c_bus_cond` (done early), `cmd_ctrl`; push to GitHub, skeleton hardened | Next |
-| 4–5 | `i3c_tgt` private write/read (M3), `i2c_ctrl` (M4), RP2040 firmware starts | To do |
-| 6 | `i3c_daa`: ENTDAA, SETDASA, RSTDAA (M3) | To do |
+| 2 | 20-bit timeout module (`timeout20`) | Done |
+| 3 | `i3c_bus_cond`, `cmd_ctrl` with the timeout wired in; push to GitHub, skeleton hardened | Done (26–27 Sep) |
+| 4–5 | `i3c_tgt` private write/read (M3), `i2c_ctrl` (M4) | Done early (27 Sep) |
+| 4–7 | RP2040 I3C controller firmware (M3) | To do |
+| 6 | `i3c_daa`: ENTDAA, SETDASA, RSTDAA (M3) | Done early (27 Sep) |
+| 7–8 | Full RTL hardened (area, timing); DAA, HDR, error tests | Tests pass in simulation; hardening next |
+| 8–9 | Formal properties F1–F5, FPGA dry run with the RP2040 | To do |
+| 10–12 | Gate-level sim, sign-off, datasheet, submit | To do |
 
-Test results today: 29/29 passing (top 4, i3c_bus_cond 6, fifo4x8 5, clkdiv 3,
-timeout20 5, sync2_edge 3, I²C model 3).
+Test results today: 58/58 passing (top level 17, cmd_ctrl 8, i2c_ctrl 6,
+two bridges 2, i3c_bus_cond 6, fifo4x8 5, clkdiv 3, timeout20 5, sync2_edge 3,
+I²C model 3). The top level covers ENTDAA / SETDASA / RSTDAA, every bridged
+operation, NACK while busy, End-of-Data and controller abort, TE0–TE3, HDR entry
+and exit, downstream NACK and both timeouts; the two-bridge suite checks ENTDAA
+arbitration on a shared bus.
 
 ## Layout
 
 ```
-src/        project.v (tt_um_i3cbridge), i3c_bus_cond.v, sync2_edge.v, fifo4x8.v, clkdiv.v, timeout20.v
-test/       tb.v + test.py (top level, run by the TT CI through make)
+src/        project.v (tt_um_i3cbridge), i3c_tgt.v, i3c_daa.v, i3c_bus_cond.v, cmd_ctrl.v, i2c_ctrl.v,
+            sync2_edge.v, fifo4x8.v, clkdiv.v, timeout20.v
+test/       tb.v + test.py (top level, run by the TT CI through make, RTL and gate level)
 test/unit/  unit tests per module + the I²C model check
 test/models i3c_controller.py (I3C SDR controller), I²C target and controller models
 test/run.py runs everything without make (Windows friendly)
@@ -51,8 +60,7 @@ On Linux the TT flow also works: `cd test && make`.
 
 - Put all four team members in `info.yaml` (`author`).
 - Consider renaming the top module to `tt_um_<github user>_i3cbridge` so it is unique on the shuttle.
-- Confirm the PID placeholder, part ID and static address (docs/architecture.md).
-- Enable GitHub Pages for the `gds` viewer job ([TT FAQ](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)).
+- Confirm the PID placeholder, part ID and static address (`src/i3c_daa.v`, docs/architecture.md).
 
 ## Tiny Tapeout resources
 

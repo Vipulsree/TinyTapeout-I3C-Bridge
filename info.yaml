@@ -20,6 +20,13 @@ project:
     - "project.v"
     - "sync2_edge.v"
     - "i3c_bus_cond.v"
+    - "i3c_tgt.v"
+    - "i3c_daa.v"
+    - "cmd_ctrl.v"
+    - "fifo4x8.v"
+    - "timeout20.v"
+    - "clkdiv.v"
+    - "i2c_ctrl.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).

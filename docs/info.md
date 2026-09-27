@@ -23,12 +23,13 @@ read address and the controller retries; `IRQ` shows when the response is ready.
 
 Supported: 7'h7E broadcast, private write/read, ENTDAA, SETDASA, RSTDAA,
 odd-parity T-bits, End-of-Data, HDR entry detection and HDR exit.
-Not supported: in-band interrupts, Hot-Join, HDR data, other CCCs (NACKed).
+Not supported: in-band interrupts, Hot-Join, HDR data, other CCCs (broadcast
+ones are ignored, direct ones NACKed).
 The I3C bus must run at 1 MHz or slower (BCR bit 0 advertises the limit).
 
-**Current silicon-bring-up build:** until the target lands, `uo_out[3:0]` shows
-bus activity: bit 0 = inside a transfer, bits 2:1 = START count mod 4, bit 3
-toggles on every HDR exit.
+`uo_out[3:0]` shows the target state: 0 idle, 1 address, 2 ACK, 3 CCC,
+4 ENTDAA identity, 5 ENTDAA address, 6 SETDASA, 7 private write, 8 private read,
+9 HDR (ignoring the bus), 10 waiting for Sr or STOP.
 
 ## How to test
 
