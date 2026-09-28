@@ -32,7 +32,7 @@ project:
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: "SA_LSB"
+  ui[0]: ""
   ui[1]: "PID_INST[0]"
   ui[2]: "PID_INST[1]"
   ui[3]: "I2C_FAST"

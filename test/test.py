@@ -3,9 +3,9 @@
 """Top-level tests for tt_um_i3cbridge. The TT CI runs these through test/Makefile,
 at RTL and on the gate-level netlist, so they only use pins and tb wires.
 
-Covers dynamic address assignment (ENTDAA, SETDASA, RSTDAA), bridged I2C
-transactions (write, read, write-then-read, status), NACK while busy, the
-End-of-Data T-bit and controller abort, errors TE0-TE3, HDR entry and exit,
+Covers dynamic address assignment (ENTDAA, RSTDAA; SETDASA is NACKed), bridged
+I2C transactions (write, read, write-then-read, status), NACK while busy, the
+End-of-Data T-bit and controller abort, errors TE1-TE3, HDR entry and exit,
 downstream NACK and both timeouts. Every test also checks that the bridge
 never fights the I3C controller, never drives SCL and never drives I2C high."""
 import os
@@ -16,7 +16,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import ClockCycles, FallingEdge, Timer
 
 from models.i2c_target import I2CTarget
-from models.i3c_controller import BROADCAST, CCC_ENTDAA, CCC_SETDASA, I3CController, odd_parity
+from models.i3c_controller import BROADCAST, CCC_ENTDAA, I3CController, odd_parity
 
 CLK_NS = 40  # 25 MHz
 GATES = os.environ.get("GATES") == "yes"
@@ -27,7 +27,7 @@ DA = 0x08
 SA = 0x3A
 OP_WRITE, OP_READ, OP_WRRD, OP_STATUS = range(4)
 NACK, PARITY, OVF, TIMEOUT = 0x80, 0x40, 0x20, 0x10
-S_IDLE, S_HDR = 0, 9
+S_IDLE, S_HDR = 0, 8
 
 
 def cmd(op, length=1):
@@ -138,13 +138,14 @@ async def test_entdaa_identity_and_address(dut):
 
 
 @cocotb.test()
-async def test_setdasa_and_rstdaa(dut):
-    ctl, watch, _ = await reset(dut, ui=I2C_FAST | 1, sensor=False)  # SA_LSB = 1: 0x3B
-    assert not await ctl.setdasa(SA, 0x30)
-    assert await ctl.setdasa(SA + 1, 0x30)
-    assert uo(dut)["da_valid"] == 1
+async def test_setdasa_not_supported_and_rstdaa(dut):
+    ctl, watch, _ = await reset(dut, sensor=False)
+    # SETDASA was removed to fit the tile: the static address is never ACKed
+    for sa in (SA, SA + 1):
+        assert not await ctl.setdasa(sa, 0x30)
+    assert uo(dut)["da_valid"] == 0
+    await assign(ctl, 0x30)
     assert await transact(ctl, 0x30, [cmd(OP_STATUS), 0]) == [0x00]
-    assert not await ctl.setdasa(SA + 1, 0x31)  # only without a dynamic address
     assert await ctl.rstdaa()
     assert uo(dut)["da_valid"] == 0
     assert await ctl.private_read(0x30) is None
@@ -282,19 +283,16 @@ async def test_te3_bad_address_parity_then_rejoin(dut):
 
 
 @cocotb.test()
-async def test_te0_waits_for_hdr_exit(dut):
+async def test_corrupted_broadcast_is_just_not_acked(dut):
     ctl, watch, _ = await reset(dut, sensor=False)
     await assign(ctl)
     await ctl.start()
-    await ctl.header(0x7F, 0)  # 7E/W with one bit wrong
+    assert not await ctl.header(0x7F, 0)  # 7E/W with one bit wrong (TE0 detection was removed)
     await ctl.stop()
-    await ClockCycles(dut.clk, 10)
-    assert uo(dut)["state"] == S_HDR
-    assert await ctl.private_read(DA) is None  # deaf
-    await ctl.hdr_exit()
     await ClockCycles(dut.clk, 10)
     assert uo(dut)["state"] == S_IDLE
     assert await transact(ctl, DA, [cmd(OP_STATUS), 0]) == [0x00]
+    assert watch.faults == []
 
 
 @cocotb.test()

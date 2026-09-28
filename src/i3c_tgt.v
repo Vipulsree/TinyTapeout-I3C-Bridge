@@ -9,9 +9,10 @@
 // Works on the synchronised SCL / SDA and the bus conditions from i3c_bus_cond.
 //
 // Supported: 7'h7E broadcast (always ACKed), private write / read to the
-// dynamic address, ENTDAA with arbitration, SETDASA to the static address,
-// RSTDAA, ENTHDR0-7 (ignore until the HDR Exit Pattern), TE0-TE3 handling.
-// Other CCCs: broadcast ones are ignored, direct ones get the address NACKed.
+// dynamic address, ENTDAA with arbitration, RSTDAA, ENTHDR0-7 (ignore until the
+// HDR Exit Pattern), parity errors TE1-TE3. Other CCCs: broadcast ones are
+// ignored, direct ones (SETDASA included) get the dynamic address NACKed.
+// SETDASA and TE0 detection were removed to fit the tile (docs/architecture.md).
 //
 // SDA driver: open-drain phases (ACK, ENTDAA identity) only ever pull low;
 // push-pull phases (read data and T-bits) drive both levels. The drive changes
@@ -30,7 +31,6 @@ module i3c_tgt (
     input wire stop,
     input wire hdr_exit,
     input wire timeout,   // bus stalled mid-transfer: release SDA, back to IDLE
-    input wire sa_lsb,    // static address LSB: 7'h3A / 7'h3B
 
     output reg sda_oe,
     output reg sda_out,
@@ -67,16 +67,15 @@ module i3c_tgt (
                    S_CCC = 4'd3,      // CCC code + T
                    S_DAA_ID = 4'd4,   // ENTDAA: PID, BCR, DCR out, open-drain, arbitration
                    S_DAA_ADDR = 4'd5, // ENTDAA: DA + parity in
-                   S_SDASA = 4'd6,    // SETDASA: {DA, 0} + T in
-                   S_PRIV_WR = 4'd7,  // private write bytes + T
-                   S_PRIV_RD = 4'd8,  // private read bytes + End-of-Data T
-                   S_HDR = 4'd9,      // ignore everything until the HDR Exit Pattern
-                   S_WAIT = 4'd10;    // not addressed, error or lost arbitration: wait for Sr / P
+                   S_PRIV_WR = 4'd6,  // private write bytes + T
+                   S_PRIV_RD = 4'd7,  // private read bytes + End-of-Data T
+                   S_HDR = 4'd8,      // ignore everything until the HDR Exit Pattern
+                   S_WAIT = 4'd9;     // not addressed, error or lost arbitration: wait for Sr / P
 
-  localparam [2:0] A_WAIT = 3'd0, A_CCC = 3'd1, A_DAA = 3'd2, A_SDASA = 3'd3, A_PWR = 3'd4, A_PRD = 3'd5;
-  localparam [1:0] X_NONE = 2'd0, X_ENTDAA = 2'd1, X_SETDASA = 2'd2, X_DIRECT = 2'd3;
+  localparam [2:0] A_WAIT = 3'd0, A_CCC = 3'd1, A_DAA = 3'd2, A_PWR = 3'd3, A_PRD = 3'd4;
+  localparam [1:0] X_NONE = 2'd0, X_ENTDAA = 2'd1, X_DIRECT = 2'd2;
 
-  localparam [7:0] CCC_RSTDAA = 8'h06, CCC_ENTDAA = 8'h07, CCC_SETDASA = 8'h87;
+  localparam [7:0] CCC_RSTDAA = 8'h06, CCC_ENTDAA = 8'h07;
   localparam [6:0] BCAST = 7'h7E;
 
   reg [3:0] st;
@@ -84,31 +83,26 @@ module i3c_tgt (
   reg [7:0] sh;
   reg       par;      // XOR of the data bits received so far (odd parity check)
   reg [2:0] ack_to;   // what follows the ACK being driven
-  reg [1:0] ctx;      // CCC context since the last 7E/W: ENTDAA, SETDASA or another direct CCC
-  reg       in_xfer;  // START seen, no STOP yet (tells START from Sr)
-  reg       first;    // current header follows a START, not an Sr
+  reg [1:0] ctx;      // CCC context since the last 7E/W: ENTDAA or another direct CCC
   reg       ours;     // a private transfer to us is open
   reg       last;     // the byte being sent is the last one (T = 0)
 
   // ---------------------------------------------------------------- decode
   wire [6:0] addr = sh[7:1];
   wire       rnw = sh[0];
-  wire [7:0] te0_x = sh ^ {BCAST, 1'b0};
-  wire       te0 = (te0_x != 8'd0) & ((te0_x & (te0_x - 8'd1)) == 8'd0);  // 7E/W with one bit wrong
   wire       own_da = da_valid & (addr == da) & (ctx == X_NONE);
-  wire       own_sa = (ctx == X_SETDASA) & ~da_valid & (addr == {6'b011101, sa_lsb}) & ~rnw;
   wire       daa_rd = (addr == BCAST) & rnw & (ctx == X_ENTDAA) & ~da_valid;
 
   wire bus_ev  = (st != S_HDR) & (timeout | stop | start);
   wire hdr_end = (st == S_ADDR || st == S_DAA_ADDR) & scl_fall & (cnt == 6'd8) & ~bus_ev;
-  wire rx_st   = (st == S_CCC) | (st == S_SDASA) | (st == S_PRIV_WR);
+  wire rx_st   = (st == S_CCC) | (st == S_PRIV_WR);
   wire t_bit   = rx_st & scl_rise & (cnt == 6'd8) & ~bus_ev;
   wire par_ok  = par ^ sda;  // odd parity over the 8 data bits and T
   wire ack_end = (st == S_ACK) & scl_fall & ~bus_ev;
   wire rd_next = (st == S_PRIV_RD) & scl_fall & (cnt == 6'd9) & ~bus_ev;
   wire priv_ok = own_da & (rnw ? can_read : can_write);
 
-  assign frame_start = hdr_end & (st == S_ADDR) & ~(first & te0) & (addr != BCAST) & priv_ok;
+  assign frame_start = hdr_end & (st == S_ADDR) & (addr != BCAST) & priv_ok;
   assign frame_rd    = rnw;
   assign frame_end   = ours & bus_ev;
   assign rx_data     = sh;
@@ -116,7 +110,7 @@ module i3c_tgt (
   assign par_err     = t_bit & ~par_ok;
   assign tx_take     = (ack_end & (ack_to == A_PRD)) | rd_next;
   assign new_da      = sh[7:1];
-  assign set_da      = (hdr_end & (st == S_DAA_ADDR) & ^sh) | (t_bit & (st == S_SDASA) & par_ok);
+  assign set_da      = hdr_end & (st == S_DAA_ADDR) & ^sh;
   assign clr_da      = t_bit & (st == S_CCC) & par_ok & (sh == CCC_RSTDAA);
   assign id_idx      = (st == S_DAA_ID) ? cnt - 6'd1 : 6'd63;
   assign active      = (st != S_IDLE) & (st != S_HDR);
@@ -131,8 +125,6 @@ module i3c_tgt (
       par     <= 1'b0;
       ack_to  <= A_WAIT;
       ctx     <= X_NONE;
-      in_xfer <= 1'b0;
-      first   <= 1'b0;
       ours    <= 1'b0;
       last    <= 1'b0;
       sda_oe  <= 1'b0;
@@ -141,7 +133,6 @@ module i3c_tgt (
       if (hdr_exit) st <= S_IDLE;  // the controller follows the pattern with STOP
     end else if (timeout || stop) begin
       st      <= S_IDLE;
-      in_xfer <= 1'b0;
       ctx     <= X_NONE;
       ours    <= 1'b0;
       sda_oe  <= 1'b0;
@@ -149,8 +140,6 @@ module i3c_tgt (
     end else if (start) begin
       st      <= S_ADDR;
       cnt     <= 6'd0;
-      first   <= ~in_xfer;
-      in_xfer <= 1'b1;
       ours    <= 1'b0;
       sda_oe  <= 1'b0;
       sda_out <= 1'b0;
@@ -169,8 +158,6 @@ module i3c_tgt (
               ack_to <= A_WAIT;
               st     <= S_ACK;
             end
-          end else if (first && te0) begin
-            st <= S_HDR;  // TE0: ignore everything until the HDR Exit Pattern
           end else if (addr == BCAST && !rnw) begin
             sda_oe <= 1'b1;
             ack_to <= A_CCC;
@@ -185,10 +172,6 @@ module i3c_tgt (
             ack_to <= rnw ? A_PRD : A_PWR;
             ours   <= 1'b1;
             st     <= S_ACK;
-          end else if (own_sa) begin
-            sda_oe <= 1'b1;
-            ack_to <= A_SDASA;
-            st     <= S_ACK;
           end
         end
 
@@ -201,7 +184,6 @@ module i3c_tgt (
           sda_out <= 1'b0;
           case (ack_to)
             A_CCC:   st <= S_CCC;
-            A_SDASA: st <= S_SDASA;
             A_PWR:   st <= S_PRIV_WR;
             A_PRD: begin  // first data byte, push-pull
               st      <= S_PRIV_RD;
@@ -220,7 +202,7 @@ module i3c_tgt (
         end
 
         // ---------------------------------------------- bytes + T-bit in
-        S_CCC, S_SDASA, S_PRIV_WR:
+        S_CCC, S_PRIV_WR:
         if (scl_rise) begin
           if (cnt != 6'd8) begin
             sh  <= {sh[6:0], sda};
@@ -230,11 +212,9 @@ module i3c_tgt (
             cnt <= 6'd0;
             par <= 1'b0;
             if (!par_ok) st <= S_WAIT;  // TE1 (CCC) / TE2 (data): drop, wait for Sr or P
-            else if (st == S_SDASA) st <= S_WAIT;
             else if (st == S_CCC) begin
               st <= S_WAIT;
               if (sh == CCC_ENTDAA) ctx <= X_ENTDAA;
-              else if (sh == CCC_SETDASA) ctx <= X_SETDASA;
               else if (sh[7:3] == 5'b00100) st <= S_HDR;  // ENTHDR0-7
               else if (sh[7]) ctx <= X_DIRECT;             // unsupported direct CCC
             end

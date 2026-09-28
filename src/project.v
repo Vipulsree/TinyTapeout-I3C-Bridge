@@ -8,12 +8,12 @@
 // Track B: minimal I3C SDR target -> I2C controller bridge in one Tiny Tapeout tile.
 // Pin map and protocol: docs/info.md and docs/architecture.md.
 //
-// An I3C controller assigns the bridge a dynamic address (ENTDAA, or SETDASA to
-// the static address), then sends a command in a private write. cmd_ctrl runs
+// An I3C controller assigns the bridge a dynamic address with ENTDAA, then
+// sends a command in a private write. cmd_ctrl runs
 // it on the downstream I2C bus with i2c_ctrl, and the next private read returns
 // the data or a status byte.
 module tt_um_i3cbridge (
-    input  wire [7:0] ui_in,    // SA_LSB, PID_INST[1:0], I2C_FAST
+    input  wire [7:0] ui_in,    // PID_INST[1:0] (ui_in[2:1]), I2C_FAST (ui_in[3])
     output wire [7:0] uo_out,   // DBG_STATE[3:0], DA_VALID, IRQ, BUSY, ERR
     input  wire [7:0] uio_in,   // I3C SCL/SDA (uio[2], uio[3]), I2C SCL/SDA (uio[6], uio[7])
     output wire [7:0] uio_out,
@@ -84,7 +84,6 @@ module tt_um_i3cbridge (
       .stop       (bus_stop),
       .hdr_exit   (hdr_exit),
       .timeout    (bus_timeout),
-      .sa_lsb     (ui_in[0]),
       .sda_oe     (i3c_sda_oe),
       .sda_out    (i3c_sda_out),
       .id_idx     (id_idx),
@@ -215,7 +214,7 @@ module tt_um_i3cbridge (
   assign uio_out = {4'b0000, i3c_sda_out, 3'b000};
   assign uio_oe  = {i2c_sda_low, i2c_scl_low, 2'b00, i3c_sda_oe, 3'b000};
 
-  wire _unused = &{ena, ui_in[7:4], uio_in[5:4], uio_in[1:0], pin_rise[3:2], pin_fall[3:2],
+  wire _unused = &{ena, ui_in[7:4], ui_in[0], uio_in[5:4], uio_in[1:0], pin_rise[3:2], pin_fall[3:2],
                    ctrl_state, i2c_idle, 1'b0};
 
 endmodule
