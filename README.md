@@ -20,15 +20,15 @@ Course: EC373TA VLSI Physical Design. Track A (the six-mode bridge) lives in its
 | 3 | `i3c_bus_cond`, `cmd_ctrl` with the timeout wired in; push to GitHub, skeleton hardened | Done (26–27 Sep) |
 | 4–5 | `i3c_tgt` private write/read (M3), `i2c_ctrl` (M4) | Done early (27 Sep) |
 | 4–7 | RP2040 I3C controller firmware (M3) | To do |
-| 6 | `i3c_daa`: ENTDAA, SETDASA, RSTDAA (M3) | Done early (27 Sep) |
-| 7–8 | Full RTL hardened (area, timing); DAA, HDR, error tests | Tests pass in simulation; hardening next |
+| 6 | `i3c_daa`: ENTDAA, RSTDAA (M3); SETDASA later removed for area | Done early (27 Sep) |
+| 7–8 | Full RTL hardened (area, timing); DAA, HDR, error tests | Done: 1x1 tile, timing and DRC/LVS clean, gate-level pass |
 | 8–9 | Formal properties F1–F5, FPGA dry run with the RP2040 | To do |
 | 10–12 | Gate-level sim, sign-off, datasheet, submit | To do |
 
 Test results today: 58/58 passing (top level 17, cmd_ctrl 8, i2c_ctrl 6,
 two bridges 2, i3c_bus_cond 6, fifo4x8 5, clkdiv 3, timeout20 5, sync2_edge 3,
-I²C model 3). The top level covers ENTDAA / SETDASA / RSTDAA, every bridged
-operation, NACK while busy, End-of-Data and controller abort, TE0–TE3, HDR entry
+I²C model 3). The top level covers ENTDAA / RSTDAA (SETDASA NACKed), every bridged
+operation, NACK while busy, End-of-Data and controller abort, TE1–TE3, HDR entry
 and exit, downstream NACK and both timeouts; the two-bridge suite checks ENTDAA
 arbitration on a shared bus.
 
@@ -60,7 +60,7 @@ On Linux the TT flow also works: `cd test && make`.
 
 - Put all four team members in `info.yaml` (`author`).
 - Consider renaming the top module to `tt_um_<github user>_i3cbridge` so it is unique on the shuttle.
-- Confirm the PID placeholder, part ID and static address (`src/i3c_daa.v`, docs/architecture.md).
+- Confirm the PID placeholder and part ID (`src/i3c_daa.v`, docs/architecture.md).
 
 ## Tiny Tapeout resources
 

@@ -46,30 +46,30 @@ The state number is what DBG_STATE (`uo_out[3:0]`) shows.
 | # | State | Enters on | Does |
 | --- | --- | --- | --- |
 | 0 | IDLE | reset, STOP, stall timeout | wait for START |
-| 1 | ADDR | START or Sr | shift 7 address bits + R/W; match 7E, DA or static address |
+| 1 | ADDR | START or Sr | shift 7 address bits + R/W; match 7E or DA |
 | 2 | ACK | address (or ENTDAA DA) accepted | drive ACK open-drain until SCL falls |
 | 3 | CCC | 7E/W ACKed | CCC code + T; parity error = TE1 |
 | 4 | DAA_ID | 7E/R ACKed during ENTDAA | shift PID, BCR, DCR open-drain; lose if SDA reads 0 while sending 1 |
 | 5 | DAA_ADDR | 64 bits sent, still winning | DA + parity; ACK and store if parity is good (else TE3 NACK) |
-| 6 | SDASA | SETDASA, own static address ACKed | {DA, 0} + T; store DA (TE2 on bad parity) |
-| 7 | PRIV_WR | DA/W ACKed | bytes + T into `cmd_ctrl` (TE2 on bad parity) |
-| 8 | PRIV_RD | DA/R ACKed | bytes push-pull; T = 1 while more, T = 0 on the last byte |
-| 9 | HDR | ENTHDR0-7 or TE0 | ignore everything until `hdr_exit` |
-| 10 | WAIT | not addressed, NACK, error or lost arbitration | wait for Sr or P |
+| 6 | PRIV_WR | DA/W ACKed | bytes + T into `cmd_ctrl` (TE2 on bad parity) |
+| 7 | PRIV_RD | DA/R ACKed | bytes push-pull; T = 1 while more, T = 0 on the last byte |
+| 8 | HDR | ENTHDR0-7 | ignore everything until `hdr_exit` |
+| 9 | WAIT | not addressed, NACK, error or lost arbitration | wait for Sr or P |
 
 Details that follow from the spec subset:
 
 - **Which addresses are ACKed.** 7E/W always. 7E/R only after ENTDAA and only
   without a dynamic address. The dynamic address only when no direct CCC is in
   progress, and only when `cmd_ctrl` can take the transfer (DA/W not during an
-  I2C transaction, DA/R only with a response waiting). The static address only
-  after SETDASA and only without a dynamic address.
-- **CCC context.** ENTDAA, SETDASA and any other direct CCC set a context that
-  lasts until STOP or the next 7E/W. Other direct CCCs (GETPID, GETBCR, ...) get
-  the dynamic address NACKed; other broadcast CCCs are ignored after the parity check.
-- **TE0.** The first header after a START that is 7E/W with exactly one bit
-  wrong (3E, 5E, 6E, 76, 7A, 7C, 7F /W, or 7E/R) sends the target to HDR, where it
-  waits for the HDR Exit Pattern.
+  I2C transaction, DA/R only with a response waiting).
+- **CCC context.** ENTDAA and any other direct CCC set a context that lasts
+  until STOP or the next 7E/W. Other direct CCCs (SETDASA, GETPID, GETBCR, ...)
+  get the dynamic address NACKed; other broadcast CCCs are ignored after the
+  parity check.
+- **Removed to fit the tile.** SETDASA (ENTDAA assigns the address instead;
+  the static address is never ACKed) and TE0 detection (a corrupted 7E/W after
+  START is simply not ACKed rather than sending the target to HDR). Together
+  they saved about 540 um2 in local synthesis. TE1-TE3 remain.
 - **End-of-Data.** The target drives T push-pull and lets go of SDA as SCL rises
   in the T-bit. With T = 1 the controller may pull SDA low while SCL is high:
   that is a repeated START, and the target stops sending.
@@ -88,7 +88,7 @@ Details that follow from the spec subset:
 | PID[11:0] vendor | 0x000 |
 | BCR | 0x01 (target, max-data-speed limitation) |
 | DCR | 0x00 (generic) |
-| Static address | 7'h3A / 7'h3B (LSB = ui_in[0]) |
+| Static address | none: SETDASA was removed to fit the tile |
 
 ## Host protocol (private write / read)
 
@@ -121,16 +121,29 @@ top of `project.v`.
 | `private_write(da, data, use_7e)` | S, [7E/W, Sr,] DA/W, bytes + T, P |
 | `private_read(da, max_len, use_7e)` | S, [7E/W, Sr,] DA/R, bytes until T = 0 (aborts at max_len), P; `None` on NACK |
 | `ccc_broadcast(code, payload)` | S, 7E/W, CCC + T, payload + T, P |
-| `setdasa(sa, da)` / `rstdaa()` | direct SETDASA / broadcast RSTDAA |
+| `setdasa(sa, da)` / `rstdaa()` | direct SETDASA (the bridge NACKs it) / broadcast RSTDAA |
 | `entdaa(das)` | offers each address in turn, returns (PID, BCR, DCR, DA, acked) per target |
 | `enthdr(mode)`, `hdr_traffic(n, rng)`, `hdr_exit(pulses)` | HDR entry, DDR-like noise, exit pattern |
 
 Default SCL is 1 MHz (`period_ns=1000`). Read bits are sampled just before SCL
 rises; data changes a quarter period after SCL falls.
 
-## Area
+## Area and sign-off
 
-175 flip-flops in the finished RTL against the plan's estimate of 171
-(i3c_tgt 30, i3c_daa 8, cmd_ctrl 27, fifo4x8 39, timeout20 20, i2c_ctrl 29,
-synchronisers 12, bus conditions 3, clkdiv 6, I2C_FAST latch 1). Check
-utilisation in the first full hardening run.
+The complete RTL synthesised to 11,481 um2 and placed at 81.8% of the 1x1
+core; detailed routing got down to one violation but did not converge within
+the 6-hour CI limit. Removing SETDASA and TE0 detection brought it to:
+
+| Metric (CI, commit 32ba019) | Value |
+| --- | --- |
+| Synthesised cell area | 10,882 um2, 893 cells, 174 flip-flops |
+| Placement utilisation | 77.3% |
+| Final utilisation (with clock tree, hold and repair buffers) | 85.5% |
+| Setup slack at 25 MHz, worst corner (ss 100C 1.60 V) | +26.9 ns (about 76 MHz possible) |
+| Hold slack, worst corner (ff -40C 1.95 V) | +0.11 ns, no violations |
+| Routing DRC / Magic DRC / LVS / antenna | 0 / 0 / 0 / 0 |
+| Gate-level simulation (full cocotb suite) | pass |
+| Power, typical corner | 0.77 mW |
+
+Utilisation is high, so keep new logic small; the next relief valve is the
+FIFO (4 to 2 bytes, about 600 um2).

@@ -5,7 +5,7 @@ This file is used to generate the project datasheet.
 ## How it works
 
 The bridge is a minimal MIPI I3C Basic SDR target. An I3C controller gives it a
-dynamic address (ENTDAA, or SETDASA to static address 0x3A / 0x3B), then uses
+dynamic address with ENTDAA, then uses
 private writes and reads to run I2C transactions on a downstream I2C bus.
 It is half-duplex: it stores the request, runs it, then returns the response.
 
@@ -21,21 +21,21 @@ stalls for 35 ms (for example a sensor holding SCL low) is aborted by a 20-bit
 timeout and reported with bit 4. While the I2C transfer runs, the bridge NACKs its
 read address and the controller retries; `IRQ` shows when the response is ready.
 
-Supported: 7'h7E broadcast, private write/read, ENTDAA, SETDASA, RSTDAA,
+Supported: 7'h7E broadcast, private write/read, ENTDAA, RSTDAA,
 odd-parity T-bits, End-of-Data, HDR entry detection and HDR exit.
 Not supported: in-band interrupts, Hot-Join, HDR data, other CCCs (broadcast
 ones are ignored, direct ones NACKed).
 The I3C bus must run at 1 MHz or slower (BCR bit 0 advertises the limit).
 
 `uo_out[3:0]` shows the target state: 0 idle, 1 address, 2 ACK, 3 CCC,
-4 ENTDAA identity, 5 ENTDAA address, 6 SETDASA, 7 private write, 8 private read,
-9 HDR (ignoring the bus), 10 waiting for Sr or STOP.
+4 ENTDAA identity, 5 ENTDAA address, 6 private write, 7 private read,
+8 HDR (ignoring the bus), 9 waiting for Sr or STOP.
 
 ## How to test
 
 1. Clock 25 MHz. Connect the RP2040 I3C controller firmware to `uio[2]` (SCL)
    and `uio[3]` (SDA) with a 2.2 kOhm pull-up on SDA.
-2. Run ENTDAA (or SETDASA to 0x3A); `DA_VALID` (`uo_out[4]`) goes high.
+2. Run ENTDAA; `DA_VALID` (`uo_out[4]`) goes high.
 3. Plug an I2C temperature-sensor Pmod into the bottom `uio` row, send a private
    write `81 48 00`, then a private read to get 2 bytes of temperature.
 
