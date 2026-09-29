@@ -142,8 +142,8 @@ the 6-hour CI limit. Removing SETDASA and TE0 detection brought it to:
 | Setup slack at 25 MHz, worst corner (ss 100C 1.60 V) | +26.9 ns (about 76 MHz possible) |
 | Hold slack, worst corner (ff -40C 1.95 V) | +0.11 ns, no violations |
 | Routing DRC / Magic DRC / LVS / antenna | 0 / 0 / 0 / 0 |
-| Gate-level simulation (full cocotb suite) | pass |
-| Power, typical corner | 0.77 mW |
+| Gate-level simulation (cocotb suite) | pass: 15 tests; the two 35 ms timeout tests run at RTL only |
+| Power, typical corner (tt 25C 1.80 V) | 0.65 mW (0.77 mW in the fast corner, ff -40C 1.95 V) |
 
 Utilisation is high, so keep new logic small; the next relief valve is the
 FIFO (4 to 2 bytes, about 600 um2).

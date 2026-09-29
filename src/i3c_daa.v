@@ -24,7 +24,7 @@ module i3c_daa (
     input  wire [5:0] id_idx,  // 63 = PID[47] ... 0 = DCR[0]
     output wire       id_bit,
 
-    input  wire       set_da,  // ENTDAA or SETDASA assigned an address
+    input  wire       set_da,  // ENTDAA assigned an address
     input  wire [6:0] new_da,
     input  wire       clr_da,  // RSTDAA
     output reg  [6:0] da,
