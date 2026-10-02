@@ -40,15 +40,14 @@ module i3c_daa (
   assign id_bit = ident[id_idx];
 
   always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      da       <= 7'd0;
-      da_valid <= 1'b0;
-    end else if (clr_da) begin
-      da_valid <= 1'b0;
-    end else if (set_da) begin
-      da       <= new_da;
-      da_valid <= 1'b1;
-    end
+    if (!rst_n) da_valid <= 1'b0;
+    else if (clr_da) da_valid <= 1'b0;
+    else if (set_da) da_valid <= 1'b1;
+  end
+
+  // Data only, so no reset: da is compared only while da_valid is set.
+  always @(posedge clk) begin
+    if (set_da && !clr_da) da <= new_da;
   end
 
 endmodule

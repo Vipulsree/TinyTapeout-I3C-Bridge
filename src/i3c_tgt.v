@@ -116,12 +116,29 @@ module i3c_tgt (
   assign active      = (st != S_IDLE) & (st != S_HDR);
   assign state       = st;
 
+  // ---------------------------------------------------------------- shift register
+  // Data only, so no reset: the decode reads it only after 8 bits were shifted
+  // in, and the read path only after a byte was loaded.
+  always @(posedge clk) begin
+    if (st != S_HDR && !bus_ev) begin
+      case (st)
+        S_ADDR, S_DAA_ADDR, S_CCC, S_PRIV_WR: if (scl_rise && cnt != 6'd8) sh <= {sh[6:0], sda};
+        S_ACK: if (ack_end && ack_to == A_PRD) sh <= tx_data;  // first byte of a private read
+        S_PRIV_RD:
+        if (scl_fall) begin
+          if (cnt == 6'd9) sh <= tx_data;  // next byte
+          else if (cnt != 6'd8) sh <= {sh[6:0], 1'b0};
+        end
+        default: ;
+      endcase
+    end
+  end
+
   // ---------------------------------------------------------------- FSM
   always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       st      <= S_IDLE;
       cnt     <= 6'd0;
-      sh      <= 8'h00;
       par     <= 1'b0;
       ack_to  <= A_WAIT;
       ctx     <= X_NONE;
@@ -148,7 +165,6 @@ module i3c_tgt (
         // ---------------------------------------------- address header, ENTDAA address
         S_ADDR, S_DAA_ADDR:
         if (scl_rise && cnt != 6'd8) begin
-          sh  <= {sh[6:0], sda};
           cnt <= cnt + 6'd1;
         end else if (hdr_end) begin
           st <= S_WAIT;  // NACK unless one of the cases below ACKs
@@ -187,7 +203,6 @@ module i3c_tgt (
             A_PWR:   st <= S_PRIV_WR;
             A_PRD: begin  // first data byte, push-pull
               st      <= S_PRIV_RD;
-              sh      <= tx_data;
               last    <= tx_last;
               sda_oe  <= 1'b1;
               sda_out <= tx_data[7];
@@ -205,7 +220,6 @@ module i3c_tgt (
         S_CCC, S_PRIV_WR:
         if (scl_rise) begin
           if (cnt != 6'd8) begin
-            sh  <= {sh[6:0], sda};
             par <= par ^ sda;
             cnt <= cnt + 6'd1;
           end else begin  // T-bit
@@ -233,14 +247,12 @@ module i3c_tgt (
         end else if (scl_fall) begin
           if (cnt == 6'd9) begin  // T was 1 and no abort: next byte
             cnt     <= 6'd0;
-            sh      <= tx_data;
             last    <= tx_last;
             sda_oe  <= 1'b1;
             sda_out <= tx_data[7];
           end else if (cnt == 6'd8) begin
             sda_out <= ~last;  // T: 1 = more data, 0 = End-of-Data
           end else begin
-            sh      <= {sh[6:0], 1'b0};
             sda_out <= sh[6];
           end
         end

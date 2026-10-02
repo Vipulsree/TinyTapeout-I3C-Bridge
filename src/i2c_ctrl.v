@@ -90,11 +90,21 @@ module i2c_ctrl (
   assign d_rd_data = {sh[6:0], samp};
   assign idle      = ~on;
 
+  // ---------------------------------------------------------------- shift register
+  // Data only, so no reset: every use follows a load.
+  always @(posedge clk) begin
+    if (symend && !d_abort && !d_start) begin
+      if (st == C_START) sh <= {d_addr, rnw};
+      else if (bytes && !ackbit) sh <= {sh[6:0], samp};
+      else if (d_wr_pop) sh <= d_wr_data;  // next byte to write
+    end
+  end
+
+  // ---------------------------------------------------------------- control
   always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       st       <= C_IDLE;
       ph       <= PA;
-      sh       <= 8'h00;
       bcnt     <= 4'd0;
       cnt      <= 3'd0;
       started  <= 1'b0;
@@ -135,11 +145,9 @@ module i2c_ctrl (
               started <= 1'b1;
               st      <= C_ADDR;
               bcnt    <= 4'd0;
-              sh      <= {d_addr, rnw};
             end
             C_ADDR, C_WR, C_RD:
             if (!ackbit) begin
-              sh   <= {sh[6:0], samp};
               bcnt <= bcnt + 4'd1;
             end else begin
               bcnt <= 4'd0;
@@ -147,14 +155,9 @@ module i2c_ctrl (
                 nacked <= 1'b1;
                 st     <= C_STOP;
               end else if (st == C_ADDR) begin
-                if (rnw) st <= C_RD;
-                else begin
-                  st <= C_WR;
-                  sh <= d_wr_data;
-                end
+                st <= rnw ? C_RD : C_WR;
               end else if (!last) begin
                 cnt <= cnt - 3'd1;
-                if (st == C_WR) sh <= d_wr_data;
               end else if (st == C_WR && d_op == OP_WRRD && !second) begin
                 second <= 1'b1;  // repeated START, then the read phase
                 cnt    <= d_len;
