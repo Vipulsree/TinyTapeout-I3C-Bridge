@@ -18,6 +18,8 @@ from cocotb_tools.runner import get_results, get_runner
 TEST = Path(__file__).resolve().parent
 SRC = TEST.parent / "src"
 UNIT = TEST / "unit"
+FIRMWARE = TEST.parent / "firmware"  # the RP2 code, run against the RTL by the firmware suite
+sys.path.append(str(FIRMWARE))       # the runner hands sys.path to the simulator as PYTHONPATH
 
 TOP_SOURCES = [SRC / f for f in ("project.v", "sync2_edge.v", "i3c_bus_cond.v", "i3c_tgt.v", "i3c_daa.v",
                                   "cmd_ctrl.v", "fifo4x8.v", "timeout20.v", "clkdiv.v", "i2c_ctrl.v")]
@@ -38,6 +40,7 @@ SUITES = {
                                  UNIT / "tb_i2c_ctrl.v"], UNIT, "test_i2c_ctrl", {}),
     "two_bridges": ("tb_two_bridges", TOP_SOURCES + [UNIT / "tb_two_bridges.v"], UNIT, "test_two_bridges", {}),
     "i2c_model": ("tb_i2c_model", [UNIT / "tb_i2c_model.v"], UNIT, "test_i2c_model", {}),
+    "firmware": ("tb", TOP_SOURCES + [TEST / "tb.v"], UNIT, "test_firmware", {}),
 }
 
 
