@@ -1,0 +1,20 @@
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 6
+cover: mode cover
+cover: depth 14
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal fifo4x8.v
+prep -top fifo4x8
+
+[files]
+../src/fifo4x8.v
+fifo4x8_props.vh

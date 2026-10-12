@@ -30,4 +30,8 @@ module timeout20 #(
     else cnt <= cnt + 1'b1;
   end
 
+`ifdef FORMAL
+  `include "timeout20_props.vh"
+`endif
+
 endmodule

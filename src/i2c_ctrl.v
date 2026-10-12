@@ -185,4 +185,8 @@ module i2c_ctrl (
     end
   end
 
+`ifdef FORMAL
+  `include "i2c_ctrl_props.vh"
+`endif
+
 endmodule

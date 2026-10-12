@@ -238,4 +238,8 @@ module cmd_ctrl (
 
   wire _unused = &{fifo_empty, 1'b0};
 
+`ifdef FORMAL
+  `include "cmd_ctrl_props.vh"
+`endif
+
 endmodule

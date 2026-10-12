@@ -217,4 +217,8 @@ module tt_um_i3cbridge (
   wire _unused = &{ena, ui_in[7:4], ui_in[0], uio_in[5:4], uio_in[1:0], pin_rise[3:2], pin_fall[3:2],
                    ctrl_state, i2c_idle, 1'b0};
 
+`ifdef FORMAL
+  `include "project_props.vh"
+`endif
+
 endmodule

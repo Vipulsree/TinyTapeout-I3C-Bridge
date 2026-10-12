@@ -1,0 +1,24 @@
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 6
+cover: mode cover
+cover: depth 20
+
+[engines]
+smtbmc z3
+
+[script]
+read_verilog -sv -formal -DFV_UNIT_CMD_CTRL cmd_ctrl.v fifo4x8.v timeout20.v
+prep -top cmd_ctrl
+
+[files]
+../src/cmd_ctrl.v
+../src/fifo4x8.v
+../src/timeout20.v
+cmd_ctrl_props.vh
+fifo4x8_props.vh
+timeout20_props.vh

@@ -268,4 +268,8 @@ module i3c_tgt (
 
   wire _unused = &{scl, 1'b0};
 
+`ifdef FORMAL
+  `include "i3c_tgt_props.vh"
+`endif
+
 endmodule

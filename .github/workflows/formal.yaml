@@ -1,0 +1,33 @@
+name: formal
+on: [push, workflow_dispatch]
+jobs:
+  formal:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      # SymbiYosys and Yosys as WebAssembly builds, Z3 as the solver
+      - name: Install Python packages
+        shell: bash
+        run: pip install -r formal/requirements.txt
+
+      - name: Prove F1-F5
+        run: python formal/run.py
+
+      - name: Self-test (broken RTL must fail)
+        run: python formal/run.py --selftest
+
+      - name: Upload logs
+        if: success() || failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: formal-logs
+          path: formal/build/*.log

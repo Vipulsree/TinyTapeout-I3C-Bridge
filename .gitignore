@@ -15,3 +15,6 @@ __pycache__/
 *.pyc
 test/**/results.xml
 .venv/
+
+# formal work directories
+formal/build/
