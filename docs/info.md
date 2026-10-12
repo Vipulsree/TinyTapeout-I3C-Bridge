@@ -21,6 +21,9 @@ stalls for 35 ms (for example a sensor holding SCL low) is aborted by a 20-bit
 timeout and reported with bit 4. While the I2C transfer runs, the bridge NACKs its
 read address and the controller retries; `IRQ` shows when the response is ready.
 
+The downstream bus runs at 99.2 kHz (`I2C_FAST` = 0) or 367.6 kHz (`I2C_FAST` = 1).
+START and STOP timing meets the I2C specification (UM10204) in both modes.
+
 Supported: 7'h7E broadcast, private write/read, ENTDAA, RSTDAA,
 odd-parity T-bits, End-of-Data, HDR entry detection and HDR exit.
 Not supported: in-band interrupts, Hot-Join, HDR data, other CCCs (broadcast
@@ -33,14 +36,18 @@ The I3C bus must run at 1 MHz or slower (BCR bit 0 advertises the limit).
 
 ## How to test
 
-1. Clock 25 MHz. Connect the RP2040 I3C controller firmware to `uio[2]` (SCL)
-   and `uio[3]` (SDA) with a 2.2 kOhm pull-up on SDA.
-2. Run ENTDAA; `DA_VALID` (`uo_out[4]`) goes high.
-3. Plug an I2C temperature-sensor Pmod into the bottom `uio` row, send a private
-   write `81 48 00`, then a private read to get 2 bytes of temperature.
+1. Clock 25 MHz. The demo board's RP2 is the I3C controller: copy
+   `firmware/i3cbridge` from the project repository to it. It drives `uio[2]`
+   (SCL) and `uio[3]` (SDA); fit a 2.2 kOhm pull-up on SDA for rates above 100 kHz.
+2. Run `bringup.run_all(board, player)`. It checks the reset state, runs ENTDAA
+   (`DA_VALID`, `uo_out[4]`, goes high), RSTDAA, a status command, HDR entry and
+   exit, a parity error and an aborted read, and prints PASS or FAIL per check.
+3. Plug an I2C temperature-sensor Pmod into the bottom `uio` row. The checklist
+   then also sends a private write `81 48 00` and a private read to get 2 bytes
+   of temperature.
 
 ## External hardware
 
-- RP2040 on the demo board running the I3C controller firmware
+- RP2 on the demo board running the I3C controller firmware (`firmware/` in the repository)
 - 2.2 kOhm pull-up on I3C SDA
 - I2C temperature-sensor Pmod (Tiny Tapeout bottom-row I2C pinout), with pull-ups

@@ -13,7 +13,7 @@ Check every frame against the MIPI I3C Basic v1.2 specification before freezing.
 | `clkdiv` | M4 | Done, unit-tested | Quarter-period ticks for the I2C controller |
 | `timeout20` | M4 | Done, unit-tested | One 20-bit inactivity timer inside `cmd_ctrl` (see Timeouts) |
 | `cmd_ctrl` | M4 | Done, unit-tested | Header parser + FSM (CMD, ADDR, payload), status flags, timeouts |
-| `i2c_ctrl` | M4 | Done, unit-tested | Downstream controller, clock stretching, abort |
+| `i2c_ctrl` | M4 | Done, unit-tested | Downstream controller, clock stretching, abort; START / STOP timing per UM10204 |
 | `i3c_tgt` | M3 | Done, top-level tests | Bit engine, protocol FSM, T-bit parity, SDA driver |
 | `i3c_daa` | M3 | Done, top-level + two-bridge tests | DA register, 64-bit identity select |
 | `project.v` | M3 | Done | Wiring and pin logic |
@@ -128,22 +128,63 @@ top of `project.v`.
 Default SCL is 1 MHz (`period_ns=1000`). Read bits are sampled just before SCL
 rises; data changes a quarter period after SCL falls.
 
+## Downstream I2C timing
+
+`i2c_ctrl` builds every START, bit and STOP from quarter-period ticks (63 clocks
+at 99.2 kHz, 17 at 367.6 kHz). A bit is four ticks. In START and STOP symbols the
+two middle phases last two ticks each, so the START hold, repeated-START set-up
+and STOP set-up times are half an SCL period. Measured by
+`test_i2c_ctrl.test_start_stop_timing`:
+
+| Time | 99.2 kHz | UM10204 standard mode | 367.6 kHz | UM10204 fast mode |
+| --- | --- | --- | --- | --- |
+| tHD;STA (START hold) | 5.04 us | 4.0 us | 1.36 us | 0.6 us |
+| tSU;STA (repeated START set-up) | 5.16 us | 4.7 us | 1.48 us | 0.6 us |
+| tSU;STO (STOP set-up) | 5.16 us | 4.0 us | 1.48 us | 0.6 us |
+| tLOW | 5.04 us | 4.7 us | 1.36 us | 1.3 us |
+| tHIGH | 5.16 us | 4.0 us | 1.48 us | 0.6 us |
+| tBUF (bus free) | 15.6 us | 4.7 us | 4.84 us | 1.3 us |
+
+Until 12 Oct 2026 the three START / STOP times were one tick (2.5 us at
+99.2 kHz), below the standard-mode minimums. The fix costs one flip-flop.
+
+## Formal proofs
+
+`formal/` proves plan properties F1 to F5 with SymbiYosys and Z3
+(`python formal/run.py`, also the CI job `formal`): FIFO bounds and ordering, the
+SDA pad's open-drain / push-pull rule, SDA changes only after SCL falls, the
+target returns to IDLE after STOP or a stall and the timeout bounds every other
+wait, and SCL is never driven. Details and limits: [formal/README.md](../formal/README.md).
+The modules end with an `ifdef FORMAL` include for their properties; nothing
+else in the flow defines `FORMAL`.
+
+## RP2 firmware
+
+`firmware/` holds a MicroPython I3C controller for the demo board's RP2 and the
+bring-up checklist (reset state, ENTDAA / RSTDAA, status, bridged I2C read, HDR,
+parity error, aborted read, SCL rate sweep). The same Python runs against the RTL
+in `test/unit/test_firmware.py`. See [firmware/README.md](../firmware/README.md)
+and [fpga_dry_run.md](fpga_dry_run.md).
+
 ## Area and sign-off
 
 The complete RTL synthesised to 11,481 um2 and placed at 81.8% of the 1x1
 core; detailed routing got down to one violation but did not converge within
-the 6-hour CI limit. Removing SETDASA and TE0 detection brought it to:
+the 6-hour CI limit. Removing SETDASA and TE0 detection brought it to 10,882 um2
+and 77.3% (commit 32ba019). The I2C START / STOP timing fix added one flip-flop:
 
-| Metric (CI, commit 32ba019) | Value |
+| Metric (CI run 38198610342, commit 2ee2d64) | Value |
 | --- | --- |
-| Synthesised cell area | 10,882 um2, 893 cells, 174 flip-flops |
-| Placement utilisation | 77.3% |
-| Final utilisation (with clock tree, hold and repair buffers) | 85.5% |
-| Setup slack at 25 MHz, worst corner (ss 100C 1.60 V) | +26.9 ns (about 76 MHz possible) |
-| Hold slack, worst corner (ff -40C 1.95 V) | +0.11 ns, no violations |
+| Synthesised cell area | 10,929 um2, 901 cells, 175 flip-flops |
+| Placement utilisation | 77.7% |
+| Final utilisation (with clock tree, hold and repair buffers) | 85.6% |
+| Setup slack at 25 MHz, worst corner (ss 100C 1.60 V) | +26.5 ns (about 74 MHz possible) |
+| Hold slack, worst corner (ff -40C 1.95 V) | +0.12 ns, no violations |
 | Routing DRC / Magic DRC / LVS / antenna | 0 / 0 / 0 / 0 |
 | Gate-level simulation (cocotb suite) | pass: 15 tests; the two 35 ms timeout tests run at RTL only |
-| Power, typical corner (tt 25C 1.80 V) | 0.65 mW (0.77 mW in the fast corner, ff -40C 1.95 V) |
+| Power, typical corner (tt 25C 1.80 V) | 0.67 mW (0.79 mW in the fast corner, ff -40C 1.95 V) |
 
-Utilisation is high, so keep new logic small; the next relief valve is the
-FIFO (4 to 2 bytes, about 600 um2).
+The tile is full. This version needed 39 minutes of CI, and detailed routing sat
+at one violation for many iterations before it cleared (the previous version
+routed in 13 minutes). Do not add logic without removing some; the next relief
+valve is the FIFO (4 to 2 bytes, about 600 um2).
