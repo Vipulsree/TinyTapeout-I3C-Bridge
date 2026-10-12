@@ -1,7 +1,7 @@
 # Tiny Tapeout project information
 project:
   title:        "Minimal I3C target to I2C bridge"   # Project title
-  author:       "Vipul S, Shylashree N, RV College of Engineering"   # authors, guide, college
+  author:       "Vipul S, Shridatta M Hebbar, Shreevathsa Kuthethoor, Anay Katti, Shylashree N, RV College of Engineering"
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "I3C SDR target that runs I2C transactions on a downstream bus via private writes and reads"
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
