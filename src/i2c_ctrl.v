@@ -15,10 +15,12 @@
 // Every START, STOP and bit is one symbol of four quarter periods (clkdiv ticks):
 //   A  SCL low, SDA changes | B  SCL released; waits while a device stretches it
 //   C  SCL high             | D  SCL pulled low
-// SDA is sampled at the B -> C tick. Both lines are open-drain (the controller
-// only pulls low) and the drivers are registered, one clock behind the phase:
-// the decode glitches between states, and a glitch on SCL or SDA is a clock
-// edge or a START.
+// SDA is sampled at the B -> C tick. In START and STOP symbols B and C last two
+// ticks each, so the START hold, repeated-START set-up and STOP set-up times are
+// half an SCL period (5.04 us at 99.2 kHz; UM10204 asks for 4.0 / 4.7 / 4.0 us)
+// instead of a quarter. Both lines are open-drain (the controller only pulls
+// low) and the drivers are registered, one clock behind the phase: the decode
+// glitches between states, and a glitch on SCL or SDA is a clock edge or a START.
 module i2c_ctrl (
     input wire clk,
     input wire rst_n,
@@ -66,9 +68,12 @@ module i2c_ctrl (
   reg       nacked;
   reg       aborting;
   reg       samp;     // SDA sampled at the B -> C tick
+  reg       half;     // START / STOP: first of the two ticks of phase B or C is over.
+                      // Cleared by the tick in phase A, so a new START or an abort needs no reset.
 
   wire on      = (st != C_IDLE);
   wire hold    = (ph == PB) & ~scl & ~aborting;  // a device is stretching SCL
+  wire slow    = ((st == C_START) | (st == C_STOP)) & (ph[1] ^ ph[0]) & ~half;  // B, C: stay one more tick
   wire symend  = on & tick & (ph == PD);
   wire ackbit  = (bcnt == 4'd8);
   wire last    = (cnt == 3'd1);
@@ -102,6 +107,7 @@ module i2c_ctrl (
       nacked   <= 1'b0;
       aborting <= 1'b0;
       samp     <= 1'b1;
+      half     <= 1'b0;
       scl_low  <= 1'b0;
       sda_low  <= 1'b0;
       d_done   <= 1'b0;
@@ -127,7 +133,8 @@ module i2c_ctrl (
         nacked   <= 1'b0;
         aborting <= 1'b0;
       end else if (on && tick) begin
-        ph <= ph + 2'd1;
+        half <= slow;
+        if (!slow) ph <= ph + 2'd1;
         if (ph == PB) samp <= sda;
         if (ph == PD) begin
           case (st)
