@@ -61,6 +61,14 @@ def tools():
     sys.exit("sby not found: pip install -r formal/requirements.txt")
 
 
+def warm_up(cmd):
+    """YoWASP compiles Yosys on its first use and caches the result. sby runs the
+    tasks of a file side by side, and two first uses at once can collide, so run
+    Yosys once on its own first."""
+    if cmd[0] == "yowasp-sby":
+        subprocess.run(["yowasp-yosys", "-V"], capture_output=True, text=True)
+
+
 def run_sby(cmd, sby_file, task=None, cwd=FORMAL, prefix=None):
     """Run one .sby file; return {task: status} from the DONE lines."""
     prefix = prefix or BUILD / sby_file.stem
@@ -102,6 +110,7 @@ def main():
     ap.add_argument("--selftest", action="store_true", help="check that broken RTL makes the proofs fail")
     args = ap.parse_args()
     cmd = tools()
+    warm_up(cmd)
 
     if args.selftest:
         print("Self-test: each line breaks the RTL in one place; the proof must fail.")
@@ -113,6 +122,9 @@ def main():
             continue
         t0 = time.time()
         res, out = run_sby(cmd, sby_file)
+        if not res or "ERROR" in res.values():  # a tool error, not a failed proof: show it, try once more
+            print(out[-2000:])
+            res, out = run_sby(cmd, sby_file)
         if not res:
             res = {"?": "ERROR"}
             print(out[-2000:])
