@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Unit tests for i2c_ctrl against the Python I2C target model: write, read,
-write-then-read with repeated START, NACK, both SCL rates, clock stretching and
-abort. The test plays cmd_ctrl (a list stands in for the FIFO)."""
+write-then-read with repeated START, NACK, both SCL rates, START / STOP timing,
+clock stretching and abort. The test plays cmd_ctrl (a list stands in for the FIFO)."""
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, FallingEdge, RisingEdge, Timer
+from cocotb.triggers import ClockCycles, FallingEdge, First, RisingEdge, Timer
 from cocotb.utils import get_sim_time
 
 from models.i2c_target import I2CTarget
@@ -116,6 +116,70 @@ async def test_scl_rates(dut):
         period = get_sim_time(unit="ns") - t0
         assert period_ns <= period <= period_ns + 5 * 40, f"fast={fast}: period {period} ns"
         assert await task
+
+
+async def bus_times(dut, sink):
+    """Log every SCL / SDA edge in sink[0] as (time in ns, "scl" | "sda", new level, level of the other line)."""
+    while True:
+        edges = {RisingEdge(dut.scl): ("scl", 1), FallingEdge(dut.scl): ("scl", 0),
+                 RisingEdge(dut.sda): ("sda", 1), FallingEdge(dut.sda): ("sda", 0)}
+        t = await First(*edges)
+        line, level = edges[t]
+        other = int((dut.sda if line == "scl" else dut.scl).value)
+        sink[0].append((get_sim_time(unit="ns"), line, level, other))
+
+
+@cocotb.test()
+async def test_start_stop_timing(dut):
+    """START hold, repeated-START set-up, STOP set-up, SCL low / high and bus-free
+    times against the UM10204 minimums for standard mode and fast mode."""
+    env = await Env(dut).setup()
+    sensor(dut)
+    #        tHD;STA tSU;STA tSU;STO tLOW  tHIGH tBUF   (ns)
+    limits = {0: (4000, 4700, 4000, 4700, 4000, 4700),
+              1: (600, 600, 600, 1300, 600, 1300)}
+    sink = [[]]
+    cocotb.start_soon(bus_times(dut, sink))
+    for fast in (0, 1):
+        dut.fast.value = fast
+        await ClockCycles(dut.clk, 2)
+        events = sink[0] = []
+        for _ in range(2):  # two transactions: the gap between them gives tBUF
+            assert await env.run(OP_WRRD, 2, data=[0x00], timeout_us=4000)
+        await ClockCycles(dut.clk, 4)
+
+        hd_sta, su_sta, su_sto, low, high, buf = [], [], [], [], [], []
+        last_scl_rise = last_scl_fall = last_start = last_stop = None
+        for t, line, level, other in events:
+            if line == "sda" and other == 1:
+                if level == 0:  # START or repeated START
+                    if last_stop is not None:
+                        buf.append(t - last_stop)
+                    elif last_scl_rise is not None:
+                        su_sta.append(t - last_scl_rise)
+                    last_start, last_stop = t, None
+                else:           # STOP
+                    su_sto.append(t - last_scl_rise)
+                    last_stop = t
+            elif line == "scl":
+                if level == 0:
+                    if last_start is not None:
+                        hd_sta.append(t - last_start)
+                        last_start = None
+                    elif last_scl_rise is not None:
+                        high.append(t - last_scl_rise)
+                    last_scl_fall = t
+                else:
+                    if last_scl_fall is not None and last_stop is None:
+                        low.append(t - last_scl_fall)
+                    last_scl_rise = t
+
+        assert len(hd_sta) == 4 and len(su_sta) == 2 and len(su_sto) == 2 and len(buf) == 1, events
+        got = [min(x) for x in (hd_sta, su_sta, su_sto, low, high, buf)]
+        names = ("tHD;STA", "tSU;STA", "tSU;STO", "tLOW", "tHIGH", "tBUF")
+        dut._log.info("fast=%d: %s", fast, ", ".join(f"{n} {g} ns" for n, g in zip(names, got)))
+        for name, g, lim in zip(names, got, limits[fast]):
+            assert g >= lim, f"fast={fast}: {name} = {g} ns, minimum {lim} ns"
 
 
 @cocotb.test()
