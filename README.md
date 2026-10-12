@@ -75,9 +75,12 @@ Formal proofs (about a minute):
 ## Before submission
 
 - Run the FPGA dry run ([docs/fpga_dry_run.md](docs/fpga_dry_run.md)) and keep its transcript.
-- Put all four team members in `info.yaml` (`author`).
-- Consider renaming the top module to `tt_um_<github user>_i3cbridge` so it is unique on the shuttle.
+- Check the `author` line in `info.yaml`: every author, then the guide and the college.
+- The top module stays `tt_um_i3cbridge`: no other project on the shuttle uses the name, and a
+  rename would mean hardening again.
 - Confirm the PID placeholder and part ID (`src/i3c_daa.v`, docs/architecture.md).
+- Import the repository into the department's GitHub account, set its description and
+  Pages source there, and submit that URL to the shuttle.
 
 ## Tiny Tapeout resources
 

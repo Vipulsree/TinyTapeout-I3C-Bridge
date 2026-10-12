@@ -1,7 +1,7 @@
 # Tiny Tapeout project information
 project:
   title:        "Minimal I3C target to I2C bridge"   # Project title
-  author:       "Vipul S and team"                   # TODO: list all four team members
+  author:       "Vipul S, Shylashree N, RV College of Engineering"   # authors, guide, college
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "I3C SDR target that runs I2C transactions on a downstream bus via private writes and reads"
   language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
@@ -11,7 +11,7 @@ project:
   tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_i3cbridge"   # TODO: consider tt_um_<github user>_i3cbridge before submission
+  top_module:  "tt_um_i3cbridge"   # checked on 12 Oct 2026: no other project on the shuttle uses this name
 
   # List your project's source files here.
   # Source files must be in ./src and you must list each source file separately, one per line.

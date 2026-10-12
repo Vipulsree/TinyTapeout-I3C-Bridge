@@ -173,7 +173,7 @@ core; detailed routing got down to one violation but did not converge within
 the 6-hour CI limit. Removing SETDASA and TE0 detection brought it to 10,882 um2
 and 77.3% (commit 32ba019). The I2C START / STOP timing fix added one flip-flop:
 
-| Metric (CI run 38198610342, commit 2ee2d64) | Value |
+| Metric (CI run 38208552778, commit da74cf1) | Value |
 | --- | --- |
 | Synthesised cell area | 10,929 um2, 901 cells, 175 flip-flops |
 | Placement utilisation | 77.7% |
@@ -184,7 +184,9 @@ and 77.3% (commit 32ba019). The I2C START / STOP timing fix added one flip-flop:
 | Gate-level simulation (cocotb suite) | pass: 15 tests; the two 35 ms timeout tests run at RTL only |
 | Power, typical corner (tt 25C 1.80 V) | 0.67 mW (0.79 mW in the fast corner, ff -40C 1.95 V) |
 
-The tile is full. This version needed 39 minutes of CI, and detailed routing sat
-at one violation for many iterations before it cleared (the previous version
-routed in 13 minutes). Do not add logic without removing some; the next relief
+The tile is full. Detailed routing of this version took 36, 55 and 54 minutes on
+three CI runs of the same logic (the results were identical; only the speed of the
+runner differed), and it sat at one violation for many iterations before it
+cleared (the previous version routed in 13 minutes). Commits after da74cf1 change
+documentation only. Do not add logic without removing some; the next relief
 valve is the FIFO (4 to 2 bytes, about 600 um2).
