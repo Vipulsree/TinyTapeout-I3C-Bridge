@@ -188,5 +188,6 @@ The tile is full. Detailed routing of this version took 36, 55 and 54 minutes on
 three CI runs of the same logic (the results were identical; only the speed of the
 runner differed), and it sat at one violation for many iterations before it
 cleared (the previous version routed in 13 minutes). Commits after da74cf1 change
-documentation only. Do not add logic without removing some; the next relief
-valve is the FIFO (4 to 2 bytes, about 600 um2).
+no RTL (only documentation, the proof runner and the author line). Do not add
+logic without removing some; the next relief valve is the FIFO (4 to 2 bytes,
+about 600 um2).
