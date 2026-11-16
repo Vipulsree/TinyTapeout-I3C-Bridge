@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Bit-level MIPI I3C SDR controller model for cocotb tests (Track B).
+"""Bit-level MIPI I3C SDR controller model for cocotb tests.
 
 Drives SCL push-pull and SDA either open-drain (address header after START, ACK,
 ENTDAA) or push-pull (data and T-bits). Every bit operation starts and ends with

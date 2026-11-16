@@ -1,88 +1,64 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Track B — Minimal I3C target → I²C bridge
+# Minimal I3C target to I2C bridge
 
-One Tiny Tapeout tile (sky130A, 25 MHz) that joins an I3C bus as an SDR target
-and runs I²C transactions on a downstream bus through private writes and reads.
-Course: EC373TA VLSI Physical Design. Track A (the multi-mode UART / SPI / I²C bridge) lives in its own repo.
+- [Read the documentation for project](docs/info.md)
 
-- Datasheet: [docs/info.md](docs/info.md)
-- FSM, SDA driver, identity and model API: [docs/architecture.md](docs/architecture.md)
-- Formal proofs of F1–F5: [formal/README.md](formal/README.md)
-- RP2 I3C controller firmware: [firmware/README.md](firmware/README.md)
-- FPGA dry run, step by step: [docs/fpga_dry_run.md](docs/fpga_dry_run.md)
-- Full plan: `Track_B_I3C_Bridge_Plan.pdf` (team folder)
+A Tiny Tapeout project (one 1x1 tile, sky130A, 25 MHz) that joins an I3C bus as an SDR
+target and runs I2C transactions on a downstream I2C bus. An I3C controller gives the
+bridge a dynamic address with ENTDAA, sends each request as a private write and collects
+the result with a private read.
 
-## Status
+## How it works
 
-| Week | Milestone | State |
-| --- | --- | --- |
-| 1 | Repo, I3C subset + identity frozen, test setup, I²C bus models | Done |
-| 2 | Python I3C controller model; `sync2_edge`, `clkdiv`, `fifo4x8` | Done |
-| 2 | 20-bit timeout module (`timeout20`) | Done |
-| 3 | `i3c_bus_cond`, `cmd_ctrl` with the timeout wired in; push to GitHub, skeleton hardened | Done (26–27 Sep) |
-| 4–5 | `i3c_tgt` private write/read (M3), `i2c_ctrl` (M4) | Done early (27 Sep) |
-| 4–7 | RP2 I3C controller firmware (M3) | Done (12 Oct): MicroPython, checked against the RTL in simulation; not yet run on hardware |
-| 6 | `i3c_daa`: ENTDAA, RSTDAA (M3); SETDASA later removed for area | Done early (27 Sep) |
-| 7–8 | Full RTL hardened (area, timing); DAA, HDR, error tests | Done: 1x1 tile, timing and DRC/LVS clean, gate-level pass |
-| 8 | Formal properties F1–F5 | Done (12 Oct): all five proved, CI job `formal` |
-| 9 | FPGA dry run with the RP2 firmware | Files ready ([docs/fpga_dry_run.md](docs/fpga_dry_run.md)); to be run on hardware |
-| 10–12 | Gate-level sim, sign-off, datasheet, submit | Gate-level sim and sign-off pass in CI; submission to do |
+- `i3c_tgt`, `i3c_daa`, `i3c_bus_cond`: the I3C Basic SDR target. Address match, ENTDAA and
+  RSTDAA, T-bit parity, End-of-Data, HDR entry and exit.
+- `cmd_ctrl`: reads the 2-byte header (command, I2C address) and up to 4 payload bytes into
+  a FIFO, runs the request, then returns the data or one status byte.
+- `i2c_ctrl`: the downstream I2C controller at 99.2 kHz or 367.6 kHz, with clock stretching.
+  A 35 ms timeout aborts a transfer that stalls.
 
-Test results today: 64/64 passing (top level 17, cmd_ctrl 8, i2c_ctrl 7,
-two bridges 2, i3c_bus_cond 6, fifo4x8 5, clkdiv 3, timeout20 5, sync2_edge 3,
-I²C model 3, firmware 5). The top level covers ENTDAA / RSTDAA (SETDASA NACKed),
-every bridged operation, NACK while busy, End-of-Data and controller abort,
-TE1–TE3, HDR entry and exit, downstream NACK and both timeouts; the two-bridge
-suite checks ENTDAA arbitration on a shared bus; `i2c_ctrl` measures the
-downstream START / STOP timing against UM10204; the firmware suite runs the RP2
-code and its bring-up checklist against the RTL.
+Pinout, command format and status bits are in [docs/info.md](docs/info.md); design notes
+are in [docs/architecture.md](docs/architecture.md).
 
-## Layout
+## How to test
 
-```
-src/        project.v (tt_um_i3cbridge), i3c_tgt.v, i3c_daa.v, i3c_bus_cond.v, cmd_ctrl.v, i2c_ctrl.v,
-            sync2_edge.v, fifo4x8.v, clkdiv.v, timeout20.v
-test/       tb.v + test.py (top level, run by the TT CI through make, RTL and gate level)
-test/unit/  unit tests per module + the I²C model check
-test/models i3c_controller.py (I3C SDR controller), I²C target and controller models
-test/run.py runs everything without make (Windows friendly)
-formal/     SymbiYosys proofs of F1–F5 (run.py, one .sby and one _props.vh per module)
-firmware/   MicroPython I3C controller and bring-up checklist for the demo board's RP2
-fpga/       wrapper to put the design on any FPGA board
-```
+On the demo board the RP2 is the I3C controller: copy `firmware/i3cbridge` to it and run
+the bring-up checklist ([firmware/README.md](firmware/README.md)).
 
-## Running the tests
-
-Needs Icarus Verilog 12 and Python 3.11+.
+In simulation (Icarus Verilog 12, Python 3.11+):
 
 ```bash
-python -m venv .venv
-.venv/Scripts/pip install -r test/requirements.txt   # Linux/macOS: .venv/bin/pip
-.venv/Scripts/python test/run.py                     # everything
-.venv/Scripts/python test/run.py -k i3c              # I3C suites only
+pip install -r test/requirements.txt
+cd test && make -B                 # the Tiny Tapeout cocotb testbench
 ```
-
-On Linux the TT flow also works: `cd test && make`.
-
-Formal proofs (about a minute):
 
 ```bash
-.venv/Scripts/pip install -r formal/requirements.txt
-.venv/Scripts/python formal/run.py
+python test/run.py                 # every suite, unit tests included (also works on Windows)
+pip install -r formal/requirements.txt
+python formal/run.py               # formal proofs
 ```
 
-## Before submission
+## Repository layout
 
-- Run the FPGA dry run ([docs/fpga_dry_run.md](docs/fpga_dry_run.md)) and keep its transcript.
-- The design is submitted to the Tiny Tapeout SKY26e shuttle (sky130A, closes 30 Nov 2026); the
-  workflows use the `ttsky26e` tag of `tt-gds-action`.
-- The top module stays `tt_um_i3cbridge`: no other project on the shuttle uses the name, and a
-  rename would mean hardening again.
-- Confirm the PID placeholder and part ID (`src/i3c_daa.v`, docs/architecture.md).
-- Import the repository into the department's GitHub account, set its description and
-  Pages source there, and submit that URL to the shuttle.
+| Folder | Contents |
+| --- | --- |
+| `src/` | Verilog sources, top module `tt_um_i3cbridge` in `project.v` |
+| `test/` | cocotb testbench (`tb.v`, `test.py`), unit tests and bus models |
+| `formal/` | SymbiYosys proofs ([formal/README.md](formal/README.md)) |
+| `firmware/` | MicroPython I3C controller and bring-up checklist for the RP2 |
+| `fpga/` | Wrapper for running the design on an FPGA ([docs/fpga_dry_run.md](docs/fpga_dry_run.md)) |
 
-## Tiny Tapeout resources
+## What is Tiny Tapeout?
 
-- [FAQ](https://tinytapeout.com/faq/) · [Recommended pinouts](https://tinytapeout.com/specs/pinouts/) · [Local hardening](https://www.tinytapeout.com/guides/local-hardening/)
+Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+
+To learn more and get started, visit https://tinytapeout.com.
+
+## Resources
+
+- [FAQ](https://tinytapeout.com/faq/)
+- [Digital design lessons](https://tinytapeout.com/digital_design/)
+- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
+- [Join the community](https://tinytapeout.com/discord)
+- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)

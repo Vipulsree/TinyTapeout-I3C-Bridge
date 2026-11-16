@@ -1,22 +1,21 @@
-# Track B architecture and implementation notes
+# Architecture and implementation notes
 
-Internal notes on how the I3C target and the bridge work.
-Check every frame against the MIPI I3C Basic v1.2 specification before freezing.
+How the I3C target and the bridge work.
 
-## Blocks and status
+## Blocks
 
-| Module | Owner | Status | Notes |
-| --- | --- | --- | --- |
-| `sync2_edge` | M4 | Done, unit-tested | I3C SCL/SDA and I2C SCL/SDA, no glitch filter |
-| `i3c_bus_cond` | M3 | Done, unit-tested | START/Sr, STOP, HDR exit (4 SDA falls with SCL low) |
-| `fifo4x8` | M4 | Done, unit-tested | Request, then response (inside `cmd_ctrl`) |
-| `clkdiv` | M4 | Done, unit-tested | Quarter-period ticks for the I2C controller |
-| `timeout20` | M4 | Done, unit-tested | One 20-bit inactivity timer inside `cmd_ctrl` (see Timeouts) |
-| `cmd_ctrl` | M4 | Done, unit-tested | Header parser + FSM (CMD, ADDR, payload), status flags, timeouts |
-| `i2c_ctrl` | M4 | Done, unit-tested | Downstream controller, clock stretching, abort; START / STOP timing per UM10204 |
-| `i3c_tgt` | M3 | Done, top-level tests | Bit engine, protocol FSM, T-bit parity, SDA driver |
-| `i3c_daa` | M3 | Done, top-level + two-bridge tests | DA register, 64-bit identity select |
-| `project.v` | M3 | Done | Wiring and pin logic |
+| Module | Function |
+| --- | --- |
+| `sync2_edge` | I3C SCL/SDA and I2C SCL/SDA, no glitch filter |
+| `i3c_bus_cond` | START/Sr, STOP, HDR exit (4 SDA falls with SCL low) |
+| `fifo4x8` | Request, then response (inside `cmd_ctrl`) |
+| `clkdiv` | Quarter-period ticks for the I2C controller |
+| `timeout20` | One 20-bit inactivity timer inside `cmd_ctrl` (see Timeouts) |
+| `cmd_ctrl` | Header parser + FSM (CMD, ADDR, payload), status flags, timeouts |
+| `i2c_ctrl` | Downstream controller, clock stretching, abort; START / STOP timing per UM10204 |
+| `i3c_tgt` | Bit engine, protocol FSM, T-bit parity, SDA driver |
+| `i3c_daa` | DA register, 64-bit identity select |
+| `project.v` | Wiring and pin logic |
 
 ## Signal rules
 
@@ -101,7 +100,7 @@ still running.
 
 ## Timeouts
 
-`src/timeout20.v` is the same 20-bit inactivity timer as Track A's own copy:
+`src/timeout20.v` is a 20-bit inactivity timer:
 it counts while `run` is high, any `kick` restarts it, and `expired` pulses
 after `limit` idle cycles (0 disables; 20 bits = 41.9 ms at 25 MHz). `cmd_ctrl`
 uses one instance for both waits below; while an I2C transaction runs only I2C
@@ -188,6 +187,7 @@ The tile is full. Detailed routing of this version took 36, 55 and 54 minutes on
 three CI runs of the same logic (the results were identical; only the speed of the
 runner differed), and it sat at one violation for many iterations before it
 cleared (the previous version routed in 13 minutes). Commits after da74cf1 change
-no RTL (only documentation, the proof runner and the author line). Do not add
+no logic (only comments, documentation, the proof runner, the author line and the
+shuttle tag of the workflows). Do not add
 logic without removing some; the next relief valve is the FIFO (4 to 2 bytes,
 about 600 um2).

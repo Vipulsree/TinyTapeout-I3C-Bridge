@@ -16,7 +16,7 @@
   "PL_TARGET_DENSITY_PCT": 60,
 
   "//": "CLOCK_PERIOD - Increase this in case you are getting setup time violations.",
-  "//": "The value is in nanoseconds, so 20ns == 50MHz. Track B runs at 25 MHz (40 ns); 20 ns is the stretch goal.",
+  "//": "The value is in nanoseconds, so 20ns == 50MHz. This design runs at 25 MHz (40 ns).",
   "CLOCK_PERIOD": 40,
 
   "//": "Hold slack margin - Increase them in case you are getting hold violations.",

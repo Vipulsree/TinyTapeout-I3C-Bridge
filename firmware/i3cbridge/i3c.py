@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""MIPI I3C SDR controller for the Track B bridge, in plain Python.
+"""MIPI I3C SDR controller for the I3C -> I2C bridge, in plain Python.
 
 The same file runs under MicroPython on the demo board's RP2 and under CPython in
 the cocotb simulation (test/unit/test_firmware.py), so these frames are the ones

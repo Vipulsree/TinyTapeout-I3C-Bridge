@@ -5,7 +5,7 @@
 
 `default_nettype none
 
-// Track B: minimal I3C SDR target -> I2C controller bridge in one Tiny Tapeout tile.
+// Minimal I3C SDR target -> I2C controller bridge in one Tiny Tapeout tile.
 // Pin map and protocol: docs/info.md and docs/architecture.md.
 //
 // An I3C controller assigns the bridge a dynamic address with ENTDAA, then

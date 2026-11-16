@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Unit tests for Track B's cmd_ctrl. The test plays the I3C target (private
+"""Unit tests for cmd_ctrl. The test plays the I3C target (private
 write bytes, frame starts / ends, takes) and a fake I2C controller that answers
 d_start. Inputs change just after rising edges, outputs are sampled mid-cycle."""
 import cocotb
