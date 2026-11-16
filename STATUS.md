@@ -66,10 +66,10 @@ RP2 code and its bring-up checklist against the RTL. Sign-off numbers are in
 - [ ] In the imported repo: set Settings > Pages > Source to GitHub Actions, and set the About
       description to:
 
-      > This project was executed by Vipul S, Shridatta M Hebbar, Shreevathsa Kuthethoor, Anay Katti, and
+      > This project was executed by Shridatta M Hebbar, Vipul S, Shreevathsa Kuthethoor, Anay Katti and
       > Shylashree N from RVCE. We sincerely acknowledge CoE-ICAS and the Dept. of ECE, RVCE, for the
-      > resources. Our special gratitude goes to Dr. H V Ravish Aradhya (HoD, ECE), Dr. K. R. Usha Rani
-      > (Associate Dean-PG), Dr. K S Geetha (Vice Principal) and Dr. K N Subramanya (Principal)
+      > resources. Our special gratitude goes to Dr. H V Ravish Aradhya (HoD, ECE), Dr. K S Geetha
+      > (Vice Principal) and Dr. K N Subramanya (Principal)
 - [ ] One commit after those changes; `test`, `gds` and `docs` all green; the repo shows Public.
 - [ ] In the Tiny Tapeout app, change the project's repo link to the imported repo and click
       "Submit a new revision" once.
