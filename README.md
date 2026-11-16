@@ -75,6 +75,8 @@ Formal proofs (about a minute):
 ## Before submission
 
 - Run the FPGA dry run ([docs/fpga_dry_run.md](docs/fpga_dry_run.md)) and keep its transcript.
+- The design is submitted to the Tiny Tapeout SKY26e shuttle (sky130A, closes 30 Nov 2026); the
+  workflows use the `ttsky26e` tag of `tt-gds-action`.
 - The top module stays `tt_um_i3cbridge`: no other project on the shuttle uses the name, and a
   rename would mean hardening again.
 - Confirm the PID placeholder and part ID (`src/i3c_daa.v`, docs/architecture.md).
