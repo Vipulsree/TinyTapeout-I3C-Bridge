@@ -63,7 +63,13 @@ RP2 code and its bring-up checklist against the RTL. Sign-off numbers are in
 - [ ] Check every frame against the MIPI I3C Basic v1.2 specification.
 - [ ] Import this repo into the RVCE-ECE account. The placeholder repo already holds the name
       `I3C_I2C_bridge`: rename or delete it first, or import under another name.
-- [ ] In the imported repo: set the About text, and set Settings > Pages > Source to GitHub Actions.
+- [ ] In the imported repo: set Settings > Pages > Source to GitHub Actions, and set the About
+      description to:
+
+      > This project was executed by Vipul S, Shridatta M Hebbar, Shreevathsa Kuthethoor, Anay Katti, and
+      > Shylashree N from RVCE. We sincerely acknowledge CoE-ICAS and the Dept. of ECE, RVCE, for the
+      > resources. Our special gratitude goes to Dr. H V Ravish Aradhya (HoD, ECE), Dr. K. R. Usha Rani
+      > (Associate Dean-PG), Dr. K S Geetha (Vice Principal) and Dr. K N Subramanya (Principal)
 - [ ] One commit after those changes; `test`, `gds` and `docs` all green; the repo shows Public.
 - [ ] In the Tiny Tapeout app, change the project's repo link to the imported repo and click
       "Submit a new revision" once.
